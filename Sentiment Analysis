@@ -1,0 +1,102 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.svm import SVC
+from sklearn.metrics import classification_report, accuracy_score
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.stem import WordNetLemmatizer
+
+# Load datasets
+depression_text_df = pd.read_excel('Depression_Text.xlsx')  # Assuming it's an Excel file
+mental_health_df = pd.read_csv('mental_health.csv')
+
+# Concatenate datasets
+combined_df = pd.concat([depression_text_df, mental_health_df], ignore_index=True)
+
+# Drop rows with NaN values
+combined_df.dropna(subset=['text', 'label'], inplace=True)
+
+# Split data into features and target variable
+X = combined_df['text']
+y = combined_df['label']
+
+# Split data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Feature extraction using TF-IDF vectorizer
+tfidf_vectorizer = TfidfVectorizer(max_features=20000)
+X_tfidf = tfidf_vectorizer.fit_transform(X)
+
+# Train a model (e.g., SVM classifier)
+model = SVC(kernel='linear')
+model.fit(X_tfidf, y)
+
+# Function to preprocess text input
+def preprocess_text(text):
+    stop_words = set(stopwords.words('english'))
+    lemmatizer = WordNetLemmatizer()
+    # Tokenization
+    tokens = word_tokenize(text)
+    # Removing punctuation and stop words, and lemmatization
+    tokens = [lemmatizer.lemmatize(word.lower()) for word in tokens if word.isalpha() and word.lower() not in stop_words]
+    return ' '.join(tokens)
+
+import nltk
+nltk.download('stopwords')
+nltk.download('punkt')
+nltk.download('wordnet')
+
+# Preprocess test data similar to training data
+processed_X_test = [preprocess_text(text) for text in X_test]
+
+# Vectorize preprocessed test data
+X_test_tfidf = tfidf_vectorizer.transform(processed_X_test)
+
+# Make predictions
+y_pred = model.predict(X_test_tfidf)
+
+# Evaluate the model
+print("Accuracy:", accuracy_score(y_test, y_pred))
+print("Classification Report:")
+print(classification_report(y_test, y_pred))
+
+import joblib
+
+# Save the trained SVM model
+joblib.dump(model, 'svm_model.pkl')
+
+# Save the TF-IDF vectorizer
+joblib.dump(tfidf_vectorizer, 'tfidf_vectorizer.pkl')
+
+# Function to preprocess text input
+def preprocess_text(text):
+    stop_words = set(stopwords.words('english'))
+    lemmatizer = WordNetLemmatizer()
+    # Tokenization
+    tokens = word_tokenize(text)
+    # Removing punctuation and stop words, and lemmatization
+    tokens = [lemmatizer.lemmatize(word.lower()) for word in tokens if word.isalpha() and word.lower() not in stop_words]
+    return ' '.join(tokens)
+
+# Function to predict mental health issues based on user input
+def predict_mental_health(text):
+    # Preprocess user input
+    processed_text = preprocess_text(text)
+    # Vectorize preprocessed text
+    text_vectorized = tfidf_vectorizer.transform([processed_text])
+    # Make prediction
+    prediction = model.predict(text_vectorized)
+    return prediction[0]
+
+# Get user input
+user_input = ''
+while user_input.lower() != 'exit':
+    user_input = input("Please enter your text (type 'exit' to quit): ")
+    # Predict mental health issues if the input is not 'exit'
+    if user_input.lower() != 'exit':
+        prediction = predict_mental_health(user_input)
+        if prediction == 1:
+            print("The text is indicating potential mental health issues.")
+        else:
+            print("The text does not indicate mental health issues.")
